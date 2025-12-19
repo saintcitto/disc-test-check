@@ -335,6 +335,7 @@ export default function App() {
 		window.scrollTo(0, 0);
 	};
 
+	// FUNGSI SHARE ULTIMATE (FIX IPHONE 8+)
 	const handleShare = async () => {
 		if (!dominantType) return;
 
@@ -343,6 +344,8 @@ export default function App() {
 			typeData.alias
 		}\n\n"${typeData.traits.join(" + ")}"\n\nCek vibe lo sekarang! 🔥`;
 
+		// 1. Coba Native Share (WhatsApp/IG/Twitter akan muncul di sini)
+		// iPhone 8+ biasanya support ini jika dalam konteks HTTPS
 		if (navigator.share) {
 			try {
 				await navigator.share({
@@ -350,19 +353,57 @@ export default function App() {
 					text: shareText,
 				});
 				return;
-			} catch (err) {}
+			} catch (err) {
+				console.log("Share cancelled or failed, falling back to clipboard...");
+			}
 		}
 
+		// 2. Fallback: Clipboard API (Modern Device)
+		// Jika native share gagal/cancel, kita coba copy text
+		try {
+			if (navigator.clipboard && window.isSecureContext) {
+				await navigator.clipboard.writeText(shareText);
+				alert(
+					"Text hasil sudah dicopy! Langsung paste di WhatsApp/Story ya! 🔥"
+				);
+				return;
+			}
+		} catch (err) {
+			console.log("Clipboard API failed, trying legacy...");
+		}
+
+		// 3. Ultimate Fallback: Legacy iOS Hack (Untuk iPhone 8 / iOS lama)
+		// Menggunakan textarea tersembunyi dengan seleksi spesifik
 		try {
 			const textarea = document.createElement("textarea");
 			textarea.value = shareText;
+
+			// CSS Hack agar tidak nge-zoom atau scroll di iOS saat di-select
+			textarea.style.position = "fixed"; // Gunakan fixed agar tidak scroll ke bawah
+			textarea.style.left = "-9999px";
+			textarea.style.top = "0";
+			textarea.setAttribute("readonly", ""); // Mencegah keyboard muncul
+
 			document.body.appendChild(textarea);
-			textarea.select();
+
+			// Select Text Method untuk iOS
+			const range = document.createRange();
+			range.selectNodeContents(textarea);
+			const selection = window.getSelection();
+			selection.removeAllRanges();
+			selection.addRange(range);
+
+			// Magic line untuk iOS lama
+			textarea.setSelectionRange(0, 999999);
+
 			document.execCommand("copy");
 			document.body.removeChild(textarea);
-			alert("Text hasil sudah dicopy! Paste di Story/Twitter lo! 🔥");
+
+			alert("Text hasil sudah dicopy! Langsung paste di WhatsApp/Story ya! 🔥");
 		} catch (err) {
-			alert("Manual screenshot aja bro! 📸");
+			// 4. Last Resort: Buka WhatsApp Langsung (Jika semua copy gagal)
+			const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+			window.open(waUrl, "_blank");
 		}
 	};
 
